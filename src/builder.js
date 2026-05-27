@@ -625,19 +625,17 @@ function formatBytes(bytes) {
  *   Linha 3 → visual tags (HDR / DV / 10bit) — só se existirem
  */
 function formatStreamName(filename = '', source = '') {
-  const provider = source === 'realdebrid' ? '🔴 RD' : '⚡ TorBox';
+  const provider = source === 'realdebrid' ? '🔴 RD' : '📦 TorBox';
 
   const quality  = extractQuality(filename);
   const resLabel = { '4K':'🟣 4ᴋ', '1080p':'🔵 ғʜᴅ', '720p':'🟢 ʜᴅ', '576p':'⚫ sᴅ', '480p':'⚫ sᴅ' }[quality] || '';
   const src      = extractSource(filename);
-  const lang     = extractAudio(filename);
 
   const line1 = `${provider} ⚡`;
   const line2  = [resLabel, src].filter(Boolean).join(' · ');
-  const line3  = lang ? `🔊 ${lang}` : '';
   const tags   = extractVisualTags(filename).join(' ');
 
-  return [line1, line2, line3, tags].filter(Boolean).join('\n');
+  return [line1, line2, tags].filter(Boolean).join('\n');
 }
 
 /**
@@ -652,6 +650,7 @@ function formatStreamDesc(filename = '', size, source) {
   const display   = filename.replace(/\.(mkv|mp4|avi|mov|ts|wmv|m4v|webm)$/i, '');
   const sz        = size ? `💾 ${formatBytes(size)}` : '';
   const codec     = extractCodec(filename);
+  const langStr   = extractAudio(filename);
   const subs      = extractSubs(filename);
   const group     = extractReleaseGroup(filename);
   const isBR      = group && BR_GROUP_RE.test(group);
@@ -662,8 +661,12 @@ function formatStreamDesc(filename = '', size, source) {
   const infoRow = [sz, codec ? `⚙️ ${codec}` : ''].filter(Boolean).join('   ');
   if (infoRow) lines.push(infoRow);
 
-  // Linha 2: legendas
-  if (subs) lines.push(`💬 ${subs}`);
+  // Linha 2: áudio + legendas
+  const audioRow = [
+    langStr ? `🔊 ${langStr}` : '',
+    subs    ? `💬 ${subs}`    : '',
+  ].filter(Boolean).join('   ');
+  if (audioRow) lines.push(audioRow);
 
   // Linha 3: grupo (flag BR para grupos conhecidos)
   if (group) {
@@ -672,7 +675,7 @@ function formatStreamDesc(filename = '', size, source) {
   }
 
   // Linha 4: nome do arquivo em smallcaps
-  if (display) lines.push(`${toSmallCaps(display)}`);
+  if (display) lines.push(`✔️${toSmallCaps(display)}`);
 
   return lines.join('\n');
 }
