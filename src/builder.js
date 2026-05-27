@@ -518,74 +518,48 @@ function qualityScore(n = '') {
   return 0;
 }
 
-function formatStreamName(filename = '', source = '') {
-  const quality = extractQuality(filename);
-  const hdr     = extractHDR(filename);
-  const codec   = extractCodec(filename);
-  const src     = extractSource(filename);
-
-  const qualityEmoji = {
-    '4K':    '🎞️ 4K',
-    '1080p': '🎞️ FHD',
-    '720p':  '💿 HD',
-    '480p':  '📼 480p',
-    '576p':  '📼 576p',
-  }[quality] || '';
-
-  const provider = source === 'realdebrid' ? '🔴 Real-Debrid' : '⚡ TorBox';
-  const badges = [qualityEmoji, hdr, codec, src].filter(Boolean).join(' · ');
-  return badges ? `${provider} · ${badges}` : provider;
+// ── Unicode small caps ────────────────────────────────────────────────────
+const SMALL_CAPS_MAP = {
+  a:'ᴀ', b:'ʙ', c:'ᴄ', d:'ᴅ', e:'ᴇ', f:'ғ', g:'ɢ', h:'ʜ',
+  i:'ɪ', j:'ᴊ', k:'ᴋ', l:'ʟ', m:'ᴍ', n:'ɴ', o:'ᴏ', p:'ᴘ',
+  r:'ʀ', s:'s', t:'ᴛ', u:'ᴜ', v:'ᴠ', w:'ᴡ', y:'ʏ', z:'ᴢ',
+};
+function toSmallCaps(str = '') {
+  return str.toLowerCase().split('').map(c => SMALL_CAPS_MAP[c] || c).join('');
 }
 
-function formatStreamDesc(filename = '', size, source) {
-  const display     = filename.replace(/\.(mkv|mp4|avi|mov|ts|wmv|m4v|webm)$/i, '');
-  const langStr     = extractAudio(filename);
-  const subs        = extractSubs(filename);
-  const sz          = size ? formatBytes(size) : '';
-  const releaseGrp  = extractReleaseGroup(filename);
+// ── Grupos de release brasileiros (flag 🇧🇷) ──────────────────────────────
+const BR_GROUP_RE = /^(bioma|c76|franceira|sigla|sf|tossato|sh4down|7sprit7|pia|riper|tomtom|andrehsa|fly|cza)$/i;
 
-  const lines = [];
-  if (display) lines.push(`📋 ${display}`);
-
-  const audioRow = [
-    langStr ? `🎧 ${langStr}` : '',
-    subs    ? `💬 Subs: ${subs}` : '',
-  ].filter(Boolean).join('   ');
-
-  const infoRow = [
-    sz     ? `💾 ${sz}`    : '',
-    source ? `☁️ ${source}` : '',
-  ].filter(Boolean).join('   ');
-
-  if (audioRow)    lines.push(audioRow);
-  if (infoRow)     lines.push(infoRow);
-  if (releaseGrp)  lines.push(`🏷️ ${releaseGrp}`);
-
-  return lines.join('\n');
-}
+// ── Extratores ────────────────────────────────────────────────────────────
 
 function extractQuality(n = '') {
   const u = n.toUpperCase();
   if (u.match(/\b(2160P|4K|UHD)\b/)) return '4K';
   if (u.match(/\b1080P\b/))           return '1080p';
   if (u.match(/\b720P\b/))            return '720p';
+  if (u.match(/\b576P\b/))            return '576p';
   if (u.match(/\b480P\b/))            return '480p';
   return '';
 }
 
-function extractCodec(n = '') {
+/** Retorna array de tags visuais estilo AIOStreams (HDR10+, DV, 10bit…) */
+function extractVisualTags(n = '') {
   const u = n.toUpperCase();
-  if (u.match(/\bH\.?265\b|\bHEVC\b|\bX265\b/)) return 'H.265';
-  if (u.match(/\bH\.?264\b|\bAVC\b|\bX264\b/))  return 'H.264';
-  if (u.match(/\bAV1\b/))                         return 'AV1';
-  return '';
+  const tags = [];
+  if (u.match(/DOLBY.?VISION|\bDV\b/))    tags.push('⭐ ᴅᴠ');
+  if (u.match(/HDR10(\+|PLUS)/))           tags.push('💫 ʜᴅʀ¹⁰⁺');
+  else if (u.match(/\bHDR10\b/))           tags.push('🌟 ʜᴅʀ¹⁰');
+  else if (u.match(/\bHDR\b/))             tags.push('🌟 ʜᴅʀ');
+  if (u.match(/\b10.?BIT\b/))              tags.push('🎨 10ʙɪᴛ');
+  return tags;
 }
 
-function extractHDR(n = '') {
+function extractCodec(n = '') {
   const u = n.toUpperCase();
-  if (u.match(/DOLBY.?VISION|DV\b/)) return 'Dolby Vision';
-  if (u.match(/HDR10\+/))            return 'HDR10+';
-  if (u.match(/\bHDR\b/))            return 'HDR';
+  if (u.match(/\bH\.?265\b|\bHEVC\b|\bX265\b/)) return 'ʜᴇᴠᴄ';
+  if (u.match(/\bH\.?264\b|\bAVC\b|\bX264\b/))  return 'ᴀᴠᴄ';
+  if (u.match(/\bAV1\b/))                         return 'ᴀᴠ1';
   return '';
 }
 
@@ -607,12 +581,15 @@ function extractAudio(n = '') {
   else if (u.match(/\bPT.?PT\b/))                 parts.push('PT-PT');
   else if (u.match(/\bLEGENDADO\b/))              parts.push('Leg.');
   else if (u.match(/\bENG(LISH)?\b/))             parts.push('EN');
-  if      (u.match(/\bATMOS\b/))                  parts.push('Atmos');
-  else if (u.match(/\bTRUEHD\b/))                 parts.push('TrueHD');
-  else if (u.match(/\bDTS.?HD\b/))                parts.push('DTS-HD');
-  else if (u.match(/\bDTS\b/))                    parts.push('DTS');
-  else if (u.match(/\bDDP?5\.?1\b|\bDD5\.?1\b/)) parts.push('DD5.1');
-  else if (u.match(/\bAAC\b/))                    parts.push('AAC');
+  // Codec de áudio: TrueHD + Atmos podem coexistir
+  if (u.match(/\bTRUEHD\b/))                      parts.push('TrueHD');
+  if (u.match(/\bATMOS\b/))                        parts.push('Atmos');
+  else if (!u.match(/\bTRUEHD\b/)) {
+    if      (u.match(/\bDTS.?HD\b/))              parts.push('DTS-HD');
+    else if (u.match(/\bDTS\b/))                  parts.push('DTS');
+    else if (u.match(/\bDDP?5\.?1\b|\bDD5\.?1\b/)) parts.push('DD5.1');
+    else if (u.match(/\bAAC\b/))                  parts.push('AAC');
+  }
   return parts.join(' · ');
 }
 
@@ -625,16 +602,82 @@ function extractSubs(n = '') {
 }
 
 function extractReleaseGroup(n = '') {
-  // Padrão comum: "-GROUPNAME" no final do nome (antes da extensão)
   const base = n.replace(/\.(mkv|mp4|avi|mov|ts|wmv|m4v|webm)$/i, '');
-  const m = base.match(/-([A-Za-z0-9]{2,10})$/);
+  const m = base.match(/-([A-Za-z0-9]{2,12})$/);
   return m ? m[1] : '';
 }
 
 function formatBytes(bytes) {
   if (!bytes) return '';
   const gb = bytes / 1024 / 1024 / 1024;
-  return gb >= 1 ? `${gb.toFixed(2)} GB` : `${(bytes / 1024 / 1024).toFixed(0)} MB`;
+  return gb >= 1
+    ? `${gb.toFixed(2)} ɢʙ`
+    : `${(bytes / 1024 / 1024).toFixed(0)} ᴍʙ`;
+}
+
+// ── Formatadores principais ───────────────────────────────────────────────
+
+/**
+ * Linha de título do stream (campo `name`).
+ * Formato inspirado no AIOStreams:
+ *   Linha 1 → provedor + indicador ⚡ cached
+ *   Linha 2 → resolução · fonte
+ *   Linha 3 → visual tags (HDR / DV / 10bit) — só se existirem
+ */
+function formatStreamName(filename = '', source = '') {
+  const provider = source === 'realdebrid' ? '🔴 RD' : '⚡ TorBox';
+
+  const quality  = extractQuality(filename);
+  const resLabel = { '4K':'🟣 4ᴋ', '1080p':'🔵 ғʜᴅ', '720p':'🟢 ʜᴅ', '576p':'⚫ sᴅ', '480p':'⚫ sᴅ' }[quality] || '';
+  const src      = extractSource(filename);
+
+  const line1 = `${provider} ⚡`;
+  const line2  = [resLabel, src].filter(Boolean).join(' · ');
+  const tags   = extractVisualTags(filename).join(' ');
+
+  return [line1, line2, tags].filter(Boolean).join('\n');
+}
+
+/**
+ * Descrição detalhada do stream (campo `description`).
+ * Formato inspirado no AIOStreams:
+ *   Linha 1 → tamanho  codec
+ *   Linha 2 → áudio  legendas
+ *   Linha 3 → grupo (com 🇧🇷 se for grupo brasileiro)
+ *   Linha 4 → nome do arquivo em smallcaps
+ */
+function formatStreamDesc(filename = '', size, source) {
+  const display   = filename.replace(/\.(mkv|mp4|avi|mov|ts|wmv|m4v|webm)$/i, '');
+  const sz        = size ? `💾 ${formatBytes(size)}` : '';
+  const codec     = extractCodec(filename);
+  const langStr   = extractAudio(filename);
+  const subs      = extractSubs(filename);
+  const group     = extractReleaseGroup(filename);
+  const isBR      = group && BR_GROUP_RE.test(group);
+
+  const lines = [];
+
+  // Linha 1: tamanho + codec
+  const infoRow = [sz, codec ? `⚙️ ${codec}` : ''].filter(Boolean).join('   ');
+  if (infoRow) lines.push(infoRow);
+
+  // Linha 2: áudio + legendas
+  const audioRow = [
+    langStr ? `🔊 ${langStr}` : '',
+    subs    ? `💬 ${subs}`    : '',
+  ].filter(Boolean).join('   ');
+  if (audioRow) lines.push(audioRow);
+
+  // Linha 3: grupo (flag BR para grupos conhecidos)
+  if (group) {
+    const flag = isBR ? '🇧🇷 ' : '';
+    lines.push(`${flag}🫟 ${toSmallCaps(group)}`);
+  }
+
+  // Linha 4: nome do arquivo em smallcaps
+  if (display) lines.push(`✔️ ${toSmallCaps(display)}`);
+
+  return lines.join('\n');
 }
 
 module.exports = { buildCatalog, buildMeta, buildStreams, getRealDebridDownloads };
