@@ -122,7 +122,7 @@ function getLogoUrl(baseUrl) {
 function getBaseManifest(baseUrl) {
   return {
     id: 'community.torbox.catalog',
-    version: '1.4.1',
+    version: '1.4.2',
     name: 'TB Media',
     description: 'Seu catálogo pessoal do TorBox com metadados do TMDB.',
     logo: getLogoUrl(baseUrl),
@@ -165,7 +165,7 @@ function getConfiguredManifest(baseUrl, config = {}) {
 
   return {
     id: 'community.torbox.catalog',
-    version: '1.4.1',
+    version: '1.4.2',
     name: 'TB Media',
     description: 'Seu catálogo pessoal do TorBox com metadados do TMDB.',
     logo: getLogoUrl(baseUrl),
@@ -194,7 +194,7 @@ app.get('/health', async (req, res) => {
     status: 'ok',
     cache: stats,
     environment: IS_SERVERLESS ? 'serverless' : 'self-hosted',
-    version: '1.4.1',
+    version: '1.4.2',
   });
 });
 
