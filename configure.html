@@ -136,6 +136,56 @@
     .toast.show { opacity: 1; transform: translateY(0); }
     .footer { text-align: center; margin-top: 1.5rem; font-size: .76rem; color: var(--muted); }
 
+    /* ── Stream Preview ───────────────────────────────────────────────── */
+    .preview-section {
+      margin-top: 1.5rem;
+    }
+    .preview-toggle {
+      width: 100%; background: none; border: 1px solid var(--border);
+      border-radius: .6rem; padding: .6rem .9rem;
+      color: var(--muted); font-size: .82rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .06em;
+      cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+      transition: border-color .2s, color .2s;
+    }
+    .preview-toggle:hover { border-color: var(--accent); color: var(--text); }
+    .preview-toggle .arr { transition: transform .25s; }
+    .preview-toggle.open .arr { transform: rotate(90deg); }
+
+    .preview-body {
+      display: none; margin-top: .75rem; background: #0a0a10;
+      border: 1px solid var(--border); border-radius: .75rem; overflow: hidden;
+    }
+    .preview-body.open { display: block; }
+
+    .preview-header {
+      padding: .55rem .9rem; background: rgba(124,58,237,.08);
+      border-bottom: 1px solid var(--border);
+      font-size: .72rem; color: var(--muted); letter-spacing: .04em;
+    }
+
+    .stream-card {
+      display: flex; gap: .75rem; padding: .75rem .9rem;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .stream-card:last-child { border-bottom: none; }
+
+    .stream-name {
+      min-width: 110px; max-width: 110px;
+      font-size: .72rem; line-height: 1.55; white-space: pre-line;
+      color: var(--text); font-weight: 600;
+    }
+    .stream-desc {
+      flex: 1; font-size: .68rem; line-height: 1.6;
+      white-space: pre-line; color: var(--muted);
+    }
+
+    .preview-note {
+      padding: .5rem .9rem; font-size: .68rem; color: var(--muted);
+      border-top: 1px solid var(--border); text-align: center;
+      background: rgba(0,0,0,.2);
+    }
+
     .referral-box {
       background: rgba(124,58,237,.08); border: 1px solid rgba(124,58,237,.3);
       border-radius: .75rem; padding: 1rem 1.1rem; margin-top: .5rem;
@@ -264,6 +314,19 @@
     </p>
   </div>
 
+  <!-- ── Preview dos Streams ─────────────────────────────────────────── -->
+  <div class="preview-section">
+    <button class="preview-toggle" id="previewToggle" onclick="togglePreview()">
+      <span>🎬 Preview dos Streams</span>
+      <span class="arr">›</span>
+    </button>
+    <div class="preview-body" id="previewBody">
+      <div class="preview-header">Exemplo de como os streams aparecem no Stremio</div>
+      <div id="previewCards"></div>
+      <div class="preview-note">Os streams reais dependem dos arquivos na sua conta TorBox / Real-Debrid</div>
+    </div>
+  </div>
+
   <div class="divider"></div>
   <div class="referral-box">
     <div class="referral-title">💜 Ainda não tem TorBox?</div>
@@ -353,6 +416,140 @@
   }
 
   document.addEventListener('keydown', e => { if (e.key === 'Enter') generate(); });
+
+  // ── Stream Preview ────────────────────────────────────────────────────
+  const SMALL_CAPS_MAP = {
+    a:'ᴀ',b:'ʙ',c:'ᴄ',d:'ᴅ',e:'ᴇ',f:'ғ',g:'ɢ',h:'ʜ',i:'ɪ',j:'ᴊ',k:'ᴋ',
+    l:'ʟ',m:'ᴍ',n:'ɴ',o:'ᴏ',p:'ᴘ',r:'ʀ',s:'s',t:'ᴛ',u:'ᴜ',v:'ᴠ',w:'ᴡ',y:'ʏ',z:'ᴢ',
+  };
+  const toSC = s => s.toLowerCase().split('').map(c => SMALL_CAPS_MAP[c]||c).join('');
+  const BR_GROUPS = /^(bioma|c76|franceira|sigla|sf|tossato|sh4down|7sprit7|pia|riper|tomtom|andrehsa|fly|cza)$/i;
+
+  function pvQuality(n) {
+    const u = n.toUpperCase();
+    if (u.match(/\b(2160P|4K|UHD)\b/)) return '4K';
+    if (u.match(/\b1080P\b/))           return '1080p';
+    if (u.match(/\b720P\b/))            return '720p';
+    if (u.match(/\b480P\b/))            return '480p';
+    return '';
+  }
+  function pvVisualTags(n) {
+    const u = n.toUpperCase(), t = [];
+    if (u.match(/DOLBY.?VISION|\bDV\b/)) t.push('⭐ ᴅᴠ');
+    if (u.match(/HDR10(\+|PLUS)/))        t.push('💫 ʜᴅʀ¹⁰⁺');
+    else if (u.match(/\bHDR10\b/))        t.push('🌟 ʜᴅʀ¹⁰');
+    else if (u.match(/\bHDR\b/))          t.push('🌟 ʜᴅʀ');
+    if (u.match(/\b10.?BIT\b/))           t.push('🎨 10ʙɪᴛ');
+    return t.join(' ');
+  }
+  function pvCodec(n) {
+    const u = n.toUpperCase();
+    if (u.match(/\bH\.?265\b|\bHEVC\b|\bX265\b/)) return 'ʜᴇᴠᴄ';
+    if (u.match(/\bH\.?264\b|\bAVC\b|\bX264\b/))  return 'ᴀᴠᴄ';
+    if (u.match(/\bAV1\b/))                         return 'ᴀᴠ1';
+    return '';
+  }
+  function pvSource(n) {
+    const u = n.toUpperCase();
+    if (u.match(/\bBLURAY\b|\bBLU.RAY\b|\bBDRIP\b/)) return 'BluRay';
+    if (u.match(/\bWEB.DL\b|\bWEBDL\b/))              return 'WEB-DL';
+    if (u.match(/\bWEBRIP\b/))                         return 'WEBRip';
+    return '';
+  }
+  function pvAudio(n) {
+    const u = n.toUpperCase(), p = [];
+    if      (u.match(/\bDUAL\b|\bDUBLADO\b/))      p.push('Dublado');
+    else if (u.match(/\bNACIONAL\b|\bPT.?BR\b/))    p.push('PT-BR');
+    else if (u.match(/\bLEGENDADO\b/))              p.push('Leg.');
+    else if (u.match(/\bENG(LISH)?\b/))             p.push('EN');
+    if (u.match(/\bTRUEHD\b/))                       p.push('TrueHD');
+    if (u.match(/\bATMOS\b/))                        p.push('Atmos');
+    else if (!u.match(/\bTRUEHD\b/)) {
+      if      (u.match(/\bDTS.?HD\b/))              p.push('DTS-HD');
+      else if (u.match(/\bDTS\b/))                  p.push('DTS');
+      else if (u.match(/\bDDP?5\.?1\b|\bDD5\.?1\b/)) p.push('DD5.1');
+      else if (u.match(/\bAAC\b/))                  p.push('AAC');
+    }
+    return p.join(' · ');
+  }
+  function pvSubs(n) {
+    const u = n.toUpperCase();
+    if (u.match(/\bMULTI.?SUB\b/))                        return 'Multi';
+    if (u.match(/\bPLSUB\b/))                             return 'PT';
+    if (u.match(/\bLEGENDADO\b/) && !u.match(/\bDUAL\b/)) return 'PT-BR';
+    return '';
+  }
+  function pvGroup(n) {
+    const base = n.replace(/\.(mkv|mp4|avi|mov|ts|wmv|m4v|webm)$/i,'');
+    const m = base.match(/-([A-Za-z0-9]{2,12})$/);
+    return m ? m[1] : '';
+  }
+  function pvBytes(b) {
+    if (!b) return '';
+    const gb = b/1024/1024/1024;
+    return gb>=1 ? `${gb.toFixed(2)} ɢʙ` : `${(b/1024/1024).toFixed(0)} ᴍʙ`;
+  }
+  function buildStreamName(filename, source) {
+    const provider = source === 'realdebrid' ? '🔴 RD' : '⚡ TorBox';
+    const q = pvQuality(filename);
+    const resLabel = {'4K':'🟣 4ᴋ','1080p':'🔵 ғʜᴅ','720p':'🟢 ʜᴅ','480p':'⚫ sᴅ'}[q]||'';
+    const src = pvSource(filename);
+    const line2 = [resLabel, src].filter(Boolean).join(' · ');
+    const tags = pvVisualTags(filename);
+    return [provider+' ⚡', line2, tags].filter(Boolean).join('\n');
+  }
+  function buildStreamDesc(filename, size, source) {
+    const display = filename.replace(/\.(mkv|mp4|avi|mov|ts|wmv|m4v|webm)$/i,'');
+    const sz = pvBytes(size);
+    const codec = pvCodec(filename);
+    const audio = pvAudio(filename);
+    const subs  = pvSubs(filename);
+    const group = pvGroup(filename);
+    const isBR  = group && BR_GROUPS.test(group);
+    const lines = [];
+    const infoRow = [sz ? `💾 ${sz}` : '', codec ? `⚙️ ${codec}` : ''].filter(Boolean).join('   ');
+    if (infoRow) lines.push(infoRow);
+    const audioRow = [audio ? `🔊 ${audio}` : '', subs ? `💬 ${subs}` : ''].filter(Boolean).join('   ');
+    if (audioRow) lines.push(audioRow);
+    if (group) lines.push(`${isBR ? '🇧🇷 ' : ''}🫟 ${toSC(group)}`);
+    if (display) lines.push(`✔️ ${toSC(display)}`);
+    return lines.join('\n');
+  }
+
+  const SAMPLES = [
+    {
+      filename: 'Sonic.the.Hedgehog.3.2024.1080p.WEB-DL.H265.Dual.Audio.PT-BR.DD5.1-BIOMA.mkv',
+      size: 9126805504, source: 'torbox',
+    },
+    {
+      filename: 'Duna.Parte.Dois.2024.2160p.BluRay.HEVC.HDR10Plus.TrueHD.Atmos-GROUP.mkv',
+      size: 45097156608, source: 'torbox',
+    },
+    {
+      filename: 'Game.of.Thrones.S01E01.720p.WEBRip.x264-FoV.mkv',
+      size: 1258291200, source: 'realdebrid',
+    },
+  ];
+
+  function renderPreview() {
+    const container = document.getElementById('previewCards');
+    container.innerHTML = SAMPLES.map(s => {
+      const name = buildStreamName(s.filename, s.source);
+      const desc = buildStreamDesc(s.filename, s.size, s.source);
+      return `<div class="stream-card">
+        <div class="stream-name">${name}</div>
+        <div class="stream-desc">${desc}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function togglePreview() {
+    const btn  = document.getElementById('previewToggle');
+    const body = document.getElementById('previewBody');
+    const isOpen = body.classList.toggle('open');
+    btn.classList.toggle('open', isOpen);
+    if (isOpen) renderPreview();
+  }
 
   function copyRef() {
     const code = document.getElementById('refCode').textContent;
