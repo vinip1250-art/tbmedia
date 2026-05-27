@@ -255,22 +255,9 @@
     <p class="field-hint">Títulos, descrições e pôsteres serão buscados neste idioma</p>
   </div>
 
-  <div class="field">
-    <label>Real-Debrid API Key <span style="color:var(--muted);font-weight:400;text-transform:none">(opcional)</span></label>
-    <div class="input-wrap">
-      <input type="password" id="rdApiKey" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" oninput="toggleRdCatalog()" />
-      <button class="toggle-btn" type="button" onclick="toggleVis('rdApiKey',this)">👁</button>
-    </div>
-    <p class="field-hint">Obtenha em <a href="https://real-debrid.com/apitoken" target="_blank">real-debrid.com/apitoken</a></p>
-  </div>
-
-  <div class="field" id="rdCatalogField" style="display:none">
-    <label>Catálogo Real-Debrid</label>
-    <select id="rdCatalog">
-      <option value="merge">🔀 Mesclar com TorBox</option>
-      <option value="separate">📂 Catálogos separados</option>
-    </select>
-  </div>
+  <!-- Real-Debrid fields hidden from UI but kept for backend compatibility -->
+  <input type="hidden" id="rdApiKey" value="" />
+  <input type="hidden" id="rdCatalog" value="merge" />
 
   <div class="field">
     <label>Ordenar por</label>
@@ -359,16 +346,9 @@
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
-  function toggleRdCatalog() {
-    const hasRd = document.getElementById('rdApiKey').value.trim().length > 0;
-    document.getElementById('rdCatalogField').style.display = hasRd ? 'block' : 'none';
-  }
-
   function generate() {
     const torboxApiKey = document.getElementById('torboxApiKey').value.trim();
     const tmdbApiKey   = document.getElementById('tmdbApiKey').value.trim();
-    const rdApiKey     = document.getElementById('rdApiKey').value.trim();
-    const rdCatalog    = document.getElementById('rdCatalog').value;
     const sortBy       = document.getElementById('sortBy').value;
     const lang         = document.getElementById('lang').value;
 
@@ -381,7 +361,6 @@
     if (!valid) return;
 
     const cfg = { torboxApiKey, tmdbApiKey, sortBy, lang };
-    if (rdApiKey) { cfg.rdApiKey = rdApiKey; cfg.rdCatalog = rdCatalog; }
 
     const encoded     = encodeConfig(cfg);
     const origin      = window.location.origin;
@@ -494,23 +473,23 @@
     const q = pvQuality(filename);
     const resLabel = {'4K':'🟣 4ᴋ','1080p':'🔵 ғʜᴅ','720p':'🟢 ʜᴅ','480p':'⚫ sᴅ'}[q]||'';
     const src = pvSource(filename);
+    const lang = pvAudio(filename);
     const line2 = [resLabel, src].filter(Boolean).join(' · ');
+    const line3 = lang ? `🔊 ${lang}` : '';
     const tags = pvVisualTags(filename);
-    return [provider+' ⚡', line2, tags].filter(Boolean).join('\n');
+    return [provider+' ⚡', line2, line3, tags].filter(Boolean).join('\n');
   }
   function buildStreamDesc(filename, size, source) {
     const display = filename.replace(/\.(mkv|mp4|avi|mov|ts|wmv|m4v|webm)$/i,'');
     const sz = pvBytes(size);
     const codec = pvCodec(filename);
-    const audio = pvAudio(filename);
     const subs  = pvSubs(filename);
     const group = pvGroup(filename);
     const isBR  = group && BR_GROUPS.test(group);
     const lines = [];
     const infoRow = [sz ? `💾 ${sz}` : '', codec ? `⚙️ ${codec}` : ''].filter(Boolean).join('   ');
     if (infoRow) lines.push(infoRow);
-    const audioRow = [audio ? `🔊 ${audio}` : '', subs ? `💬 ${subs}` : ''].filter(Boolean).join('   ');
-    if (audioRow) lines.push(audioRow);
+    if (subs) lines.push(`💬 ${subs}`);
     if (group) lines.push(`${isBR ? '🇧🇷 ' : ''}🫟 ${toSC(group)}`);
     if (display) lines.push(`✔️ ${toSC(display)}`);
     return lines.join('\n');
