@@ -2,6 +2,9 @@ const axios = require('axios');
 
 const RD_BASE = 'https://api.real-debrid.com/rest/1.0';
 
+// Keywords proibidas pelo Real-Debrid — arquivos com estes padrões são excluídos
+const RD_BANNED_RE = /\bWEBRip\b|\[RARBG\]|\[RARTV\]|\[EZTV\]|\[YTS\]|BluRay\.x26[45]|HDTV\.x264|WEB-DL/i;
+
 async function rdGet(path, apiKey, params = {}) {
   try {
     const res = await axios.get(`${RD_BASE}${path}`, {
@@ -37,6 +40,11 @@ async function getRealDebridDownloads(apiKey) {
   for (const page of allPages) {
     for (const t of page) {
       if (t.status !== 'downloaded') continue;
+      const filename = t.filename || '';
+      if (RD_BANNED_RE.test(filename)) {
+        console.log(`[RD] Excluído (keyword proibida): ${filename}`);
+        continue;
+      }
       items.push({
         id:               t.id,
         name:             t.filename,
