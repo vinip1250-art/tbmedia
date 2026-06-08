@@ -123,13 +123,13 @@ function getLogoUrl(baseUrl) {
 function getBaseManifest(baseUrl) {
   return {
     id: 'community.torbox.catalog',
-    version: '1.4.2',
+    version: '1.5.0',
     name: 'TB Media',
     description: 'Seu catálogo pessoal do TorBox com metadados do TMDB.',
     logo: getLogoUrl(baseUrl),
     resources: ['catalog', 'meta', 'stream'],
-    types: ['movie', 'series'],
-    idPrefixes: ['torbox:'],
+    types: ['movie', 'series', 'anime'],
+    idPrefixes: ['torbox:', 'tt', 'kitsu:'],
     catalogs: [],
     behaviorHints: { configurable: true, configurationRequired: true },
     configureUrl: `${baseUrl}/configure`,
@@ -166,17 +166,17 @@ function getConfiguredManifest(baseUrl, config = {}) {
 
   return {
     id: 'community.torbox.catalog',
-    version: '1.4.2',
+    version: '1.5.0',
     name: 'TB Media',
     description: 'Seu catálogo pessoal do TorBox com metadados do TMDB.',
     logo: getLogoUrl(baseUrl),
     resources: [
       'catalog',
       'meta',
-      { name: 'stream', types: ['movie', 'series'], idPrefixes: ['torbox:'] },
+      { name: 'stream', types: ['movie', 'series', 'anime'], idPrefixes: ['torbox:', 'tt', 'kitsu:'] },
     ],
-    types: ['movie', 'series'],
-    idPrefixes: ['torbox:'],
+    types: ['movie', 'series', 'anime'],
+    idPrefixes: ['torbox:', 'tt', 'kitsu:'],
     catalogs,
     behaviorHints: { configurable: true },
     stremioAddonsConfig: {
@@ -195,7 +195,7 @@ app.get('/health', async (req, res) => {
     status: 'ok',
     cache: stats,
     environment: IS_SERVERLESS ? 'serverless' : 'self-hosted',
-    version: '1.4.2',
+    version: '1.5.0',
   });
 });
 
@@ -377,14 +377,41 @@ app.get('/:token/stream/:type/:id.json', async (req, res) => {
   if (!tmdbApiKey || (!torboxApiKey && !rdApiKey)) return res.json({ streams: [] });
 
   const { type, id } = req.params;
-  if (!id.startsWith('torbox:')) return res.json({ streams: [] });
+  if (!id.startsWith('torbox:') && !id.startsWith('tt') && !id.startsWith('kitsu:')) {
+    return res.json({ streams: [] });
+  }
 
-  const parts   = id.split(':');
-  const tmdbId  = parts[2];
-  const season  = parts[3];
-  const episode = parts[4];
+  let tmdbId, season, episode;
 
   try {
+    if (id.startsWith('torbox:')) {
+      const parts = id.split(':');
+      tmdbId  = parts[2];
+      season  = parts[3];
+      episode = parts[4];
+    } else if (id.startsWith('tt')) {
+      const parts = id.split(':');
+      const imdbId = parts[0];
+      season = parts[1];
+      episode = parts[2];
+      const { imdbToTmdb } = require('./src/tmdb');
+      const mapped = await imdbToTmdb(tmdbApiKey, imdbId);
+      if (!mapped) return res.json({ streams: [] });
+      tmdbId = mapped.tmdbId;
+    } else if (id.startsWith('kitsu:')) {
+      const parts = id.split(':');
+      const kitsuId = parts[1];
+      episode = parts[2];
+      const axios = require('axios');
+      const kitsuRes = await axios.get(`https://kitsu.io/api/edge/anime/${kitsuId}`, { timeout: 5000 });
+      const title = kitsuRes.data?.data?.attributes?.canonicalTitle;
+      if (!title) return res.json({ streams: [] });
+      const { searchMetadata } = require('./src/tmdb');
+      const search = await searchMetadata(tmdbApiKey, title, 'tv', undefined, lang);
+      if (!search) return res.json({ streams: [] });
+      tmdbId = search.id;
+    }
+
     const userKey        = (torboxApiKey || rdApiKey).slice(-6);
     const streamCacheKey = cache.makeKey('stream', type, tmdbId, season || '', episode || '', userKey);
     const cachedStreams  = await cache.get(streamCacheKey);
