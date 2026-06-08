@@ -144,9 +144,10 @@ async function getMetadata(apiKey, tmdbId, type, lang = 'pt-BR') {
     return result;
   } else {
     const rawSeasons = (detail.seasons || []).filter(s => s.season_number > 0);
-    const episodeLists = await Promise.all(
-      rawSeasons.map(s => fetchSeasonVideos(auth, tmdbId, s, lang, poster))
-    );
+    const episodeLists = [];
+    for (const s of rawSeasons) {
+      episodeLists.push(await fetchSeasonVideos(auth, tmdbId, s, lang, poster));
+    }
     const videos = episodeLists.flat();
 
     const result = {

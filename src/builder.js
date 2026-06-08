@@ -465,14 +465,14 @@ async function buildStreams(torboxApiKey, tmdbApiKey, type, tmdbId, season, epis
     }
 
     if (targetFiles.length > 0) {
-      await Promise.all(targetFiles.map(async file => {
+      for (const file of targetFiles) {
         try {
           const url = await getLink(file.id);
-          if (!url) return;
+          if (!url) continue;
           const fname = file.name || file.short_name || item.name || '';
           rawStreams.push({ url, fname, size: file.size || 0, source: item.source });
         } catch {}
-      }));
+      }
     } else {
       try {
         const url = await getLink(0);

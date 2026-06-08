@@ -5,6 +5,19 @@ const RD_BASE = 'https://api.real-debrid.com/rest/1.0';
 // Keywords proibidas pelo Real-Debrid — arquivos com estes padrões são excluídos
 const RD_BANNED_RE = /\bWEBRip\b|\[RARBG\]|\[RARTV\]|\[EZTV\]|\[YTS\]|BluRay\.x26[45]|HDTV\.x264|WEB-DL/i;
 
+const infoCache = new Map();
+
+async function getRealDebridInfoCached(apiKey, itemId) {
+  const key = `${apiKey}:${itemId}`;
+  if (infoCache.has(key)) return infoCache.get(key);
+  const promise = rdGet(`/torrents/info/${itemId}`, apiKey).then(res => {
+    setTimeout(() => infoCache.delete(key), 60000);
+    return res;
+  });
+  infoCache.set(key, promise);
+  return promise;
+}
+
 async function rdGet(path, apiKey, params = {}) {
   try {
     const res = await axios.get(`${RD_BASE}${path}`, {
@@ -26,13 +39,13 @@ async function getRealDebridDownloads(apiKey) {
   // Se primeira página já está cheia, buscar páginas adicionais em paralelo (até 10 páginas = 1000 itens)
   let allPages = [first];
   if (first.length === 100) {
-    const extraPages = await Promise.all(
-      Array.from({ length: 9 }, (_, i) => rdGet('/torrents', apiKey, { page: i + 2, limit: 100 }))
-    );
-    for (const { data } of extraPages) {
+    let page = 2;
+    while (page <= 10) {
+      const { data } = await rdGet('/torrents', apiKey, { page, limit: 100 });
       if (!Array.isArray(data) || data.length === 0) break;
       allPages.push(data);
       if (data.length < 100) break;
+      page++;
     }
   }
 
@@ -64,7 +77,7 @@ async function getRealDebridDownloads(apiKey) {
 }
 
 async function getRealDebridFiles(apiKey, itemId) {
-  const { data, error } = await rdGet(`/torrents/info/${itemId}`, apiKey);
+  const { data, error } = await getRealDebridInfoCached(apiKey, itemId);
   if (error || !data) return [];
   return (data.files || [])
     .filter(f => f.selected === 1)
@@ -73,7 +86,7 @@ async function getRealDebridFiles(apiKey, itemId) {
 
 async function getRealDebridStreamLink(apiKey, itemId, fileId) {
   // 1. Pega links do torrent
-  const { data: info, error } = await rdGet(`/torrents/info/${itemId}`, apiKey);
+  const { data: info, error } = await getRealDebridInfoCached(apiKey, itemId);
   if (error || !info?.links?.length) return null;
 
   // fileId é 1-based index dos arquivos selecionados
