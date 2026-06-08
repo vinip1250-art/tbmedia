@@ -108,9 +108,10 @@ async function buildAndCacheForConfig(token, config) {
 }
 
 if (!IS_SERVERLESS) {
-  setInterval(() => {
+  setInterval(async () => {
     for (const [token, config] of knownConfigs.entries()) {
-      buildAndCacheForConfig(token, config).catch(() => {});
+      await buildAndCacheForConfig(token, config).catch(() => {});
+      await new Promise(r => setTimeout(r, 2000));
     }
   }, REFRESH);
 }
@@ -212,8 +213,11 @@ app.post('/:token/cache/clear', async (req, res) => {
   if (!config) return res.status(400).json({ error: 'Token inválido' });
   
   try {
-    const { torboxApiKey } = config;
-    const pattern = `*${torboxApiKey.slice(-6)}*`;
+    const { torboxApiKey, rdApiKey } = config;
+    const userKey = (torboxApiKey || rdApiKey || '').slice(-6);
+    if (!userKey) return res.status(400).json({ error: 'Nenhuma chave configurada' });
+    
+    const pattern = `*${userKey}*`;
     const deleted = await cache.delPattern(pattern);
     res.json({ success: true, deleted, message: 'Cache do usuário limpo' });
   } catch (err) {
